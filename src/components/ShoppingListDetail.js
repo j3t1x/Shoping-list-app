@@ -1,118 +1,195 @@
-import React, { useState } from 'react';
-import '../App.css';
+import React, { useState, useEffect } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
+import './ShoppingListDetail.css';
 
-function ShoppingListDetail() {
-  const [title, setTitle] = useState("List 1");
-  const [items, setItems] = useState([
-    { id: 1, name: "Položka 1", resolved: false },
-    { id: 2, name: "Položka 2", resolved: false },
-    { id: 3, name: "Položka 3", resolved: true },
-  ]);
-  const [newItemName, setNewItemName] = useState("");
-  
- 
-  const [isOwner] = useState(false); // Stav pro kontrolu, zda je uživatel vlastníkem "false" nebo "true"
-  
-  const [members, setMembers] = useState(["Martin", "Dan", "Tomáš"]);
-  const [currentUser] = useState("Martin"); // Předpokládáme, že aktuální uživatel je "Martin"
+const ShoppingListDetail = () => {
+  const { id } = useParams();
+  const location = useLocation();
+  const [shoppingList, setShoppingList] = useState(null);
+  const [newTitle, setNewTitle] = useState('');
+  const [newItem, setNewItem] = useState('');
+  const [newMember, setNewMember] = useState('');
+  const [isOwner, setIsOwner] = useState(false);
 
-  const addItem = () => {
-    if (newItemName.trim()) {
-      setItems([...items, { id: items.length + 1, name: newItemName, resolved: false }]);
-      setNewItemName("");
-    }
+  useEffect(() => {
+    const fetchShoppingList = async () => {
+      const fetchedList = {
+        id,
+        title: location.state?.title || `List #${id}`,
+        ownerId: 1,
+        members: [
+          { id: 2, name: 'John' },
+          { id: 3, name: 'Doe' },
+        ],
+        items: [
+          { id: 1, name: 'Milk', purchased: false },
+          { id: 2, name: 'Eggs', purchased: true },
+        ],
+      };
+
+      setShoppingList(fetchedList);
+      setNewTitle(fetchedList.title);
+      const currentUserId = 1;
+      setIsOwner(fetchedList.ownerId === currentUserId);
+    };
+
+    fetchShoppingList();
+  }, [id, location.state]);
+
+  const handleChangeTitle = () => {
+    if (!isOwner) return;
+    setShoppingList((prev) => ({ ...prev, title: newTitle }));
   };
 
-  const toggleItem = (id) => {
-    setItems(items.map(item => item.id === id ? { ...item, resolved: !item.resolved } : item));
+  const handleAddItem = () => {
+    if (!newItem.trim()) return;
+    setShoppingList((prev) => ({
+      ...prev,
+      items: [...prev.items, { id: Date.now(), name: newItem, purchased: false }],
+    }));
+    setNewItem('');
   };
 
-  const removeItem = (id) => {
-    setItems(items.filter(item => item.id !== id));
+  const toggleItemPurchased = (itemId) => {
+    setShoppingList((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        item.id === itemId ? { ...item, purchased: !item.purchased } : item
+      ),
+    }));
   };
 
-  const addMember = (name) => {
-    if (name && !members.includes(name)) {
-      setMembers([...members, name]);
-    }
+  const handleDeleteItem = (itemId) => {
+    setShoppingList((prev) => ({
+      ...prev,
+      items: prev.items.filter((item) => item.id !== itemId),
+    }));
   };
 
-  const removeMember = (name) => {
-    setMembers(members.filter(member => member !== name));
+  const handleAddMember = () => {
+    if (!newMember.trim() || !isOwner) return;
+    setShoppingList((prev) => ({
+      ...prev,
+      members: [...prev.members, { id: Date.now(), name: newMember }],
+    }));
+    setNewMember('');
   };
 
-  const leaveList = () => {
-    setMembers(members.filter(member => member !== currentUser));
+  const handleRemoveMember = (memberId) => {
+    if (!isOwner) return;
+    setShoppingList((prev) => ({
+      ...prev,
+      members: prev.members.filter((member) => member.id !== memberId),
+    }));
   };
+
+  const handleLeaveList = (memberId) => {
+    setShoppingList((prev) => ({
+      ...prev,
+      members: prev.members.filter((member) => member.id !== memberId),
+    }));
+  };
+
+  if (!shoppingList) return <div>Loading...</div>;
 
   return (
-    <div className="container">
-      <header>
-        <h1>{title}</h1>
-        {isOwner && (
-          <button className="icon-button" onClick={() => setTitle(prompt("Zadejte nový název:", title))}>
-            ✏️
-          </button>
-        )}
-      </header>
-      
+    <div className="shopping-list-detail">
+      <h1>{shoppingList.title}</h1>
 
-      <div>
-        <h2>Členové</h2>
-        <ul>
-          {members.map(member => (
-            <li key={member}>
-              {member} 
-              {isOwner && (
-                <button onClick={() => removeMember(member)}>Odebrat</button>
+      {isOwner && (
+        <div className="edit-title">
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Edit title"
+          />
+          <button onClick={handleChangeTitle} className="edit-button">
+            Change Name
+          </button>
+        </div>
+      )}
+
+      <div className="items-section">
+        <h2>Items</h2>
+        <ul className="items-list">
+          {shoppingList.items.map((item) => (
+            <li key={item.id} className="item-row">
+              <div className="item-content">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={item.purchased}
+                    onChange={() => toggleItemPurchased(item.id)}
+                  />
+                  <span className={item.purchased ? 'purchased' : ''}>
+                    {item.name}
+                  </span>
+                </label>
+              </div>
+              <button
+                onClick={() => handleDeleteItem(item.id)}
+                className="delete-button"
+                title="Delete Item"
+              >
+                🗑️
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="add-item">
+          <input
+            type="text"
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            placeholder="Add new item"
+          />
+          <button onClick={handleAddItem} className="add-button">
+            Add Item
+          </button>
+        </div>
+      </div>
+
+      <div className="members-section">
+        <h2>Members</h2>
+        <ul className="members-list">
+          {shoppingList.members.map((member) => (
+            <li key={member.id}>
+              {member.name}
+              {isOwner ? (
+                <button
+                  onClick={() => handleRemoveMember(member.id)}
+                  className="remove-button"
+                >
+                  Kick Out
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleLeaveList(member.id)}
+                  className="leave-button"
+                >
+                  Leave
+                </button>
               )}
             </li>
           ))}
         </ul>
-        {isOwner ? (
-          <input
-            type="text"
-            placeholder="Přidat nového člena"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                addMember(e.target.value);
-                e.target.value = '';
-              }
-            }}
-          />
-        ) : (
-          <button onClick={leaveList}>Odejít ze seznamu</button>
+        {isOwner && (
+          <div className="add-member">
+            <input
+              type="text"
+              value={newMember}
+              onChange={(e) => setNewMember(e.target.value)}
+              placeholder="Add new member"
+            />
+            <button onClick={handleAddMember} className="add-button">
+              Add Member
+            </button>
+          </div>
         )}
       </div>
-
-      <div>
-        <input
-          type="text"
-          placeholder="Jméno nové položky"
-          value={newItemName}
-          onChange={(e) => setNewItemName(e.target.value)}
-        />
-        <button className="add-button" onClick={addItem}>+</button>
-      </div>
-
-      <ul className="item-list">
-        {items.map(item => (
-          <li key={item.id} className="item">
-            <span className={`item-name ${item.resolved ? "item-completed" : ""}`}>
-              {item.name}
-            </span>
-            <input
-              type="checkbox"
-              className="checkbox"
-              checked={item.resolved}
-              onChange={() => toggleItem(item.id)}
-            />
-            <button className="delete-button" onClick={() => removeItem(item.id)}>🗑️</button>
-          </li>
-        ))}
-      </ul>
     </div>
   );
-}
+};
 
 export default ShoppingListDetail;
